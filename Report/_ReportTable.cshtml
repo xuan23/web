@@ -1,0 +1,61 @@
+﻿@model List<AttandanceTracking.Models.StudentAttendanceRowVM>
+
+<table class="table table-bordered table-striped align-middle">
+    <thead>
+        <tr>
+            <th>
+                <a href="javascript:void(0)" class="sort-link" data-sort="StudentName">
+                    Student Name <span class="sort-caret"></span>
+                </a>
+            </th>
+            <th>Email</th>
+            <th>Class Name</th>
+            <th>Subject Name</th>
+            <th class="text-center">Present</th>
+            <th style="min-width:180px;">
+                <a href="javascript:void(0)" class="sort-link" data-sort="Percentage">
+                    Attendance % <span class="sort-caret"></span>
+                </a>
+            </th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (Model?.Any() == true)
+        {
+            foreach (var row in Model)
+            {
+                var pct = row.Percentage;
+                <tr>
+                    <td>@row.StudentName</td>
+                    <td>@row.StudentEmail</td>
+                    <td>@row.ClassName</td>
+                    <td>@(string.IsNullOrEmpty(row.SubjectName) ? "Overall" : row.SubjectName)</td>
+
+                    <td class="text-center">
+                        <a href="javascript:void(0);" class="present-link"
+                           data-student="@row.StudentId"
+                           data-subjectname="@(string.IsNullOrEmpty(row.SubjectName) ? "Overall" : row.SubjectName)">
+                            @row.PresentCount / @row.TotalSessions
+                        </a>
+                    </td>
+
+                    <td>
+                        <div class="progress" style="height: 26px;">
+                            <div class="progress-bar @(pct < 80 ? "bg-danger" : "")"
+                                 role="progressbar"
+                                 style="width:@(pct.ToString("0.##"))%;"
+                                 aria-valuenow="@(pct.ToString("0.##"))" aria-valuemin="0" aria-valuemax="100">
+                                @(pct.ToString("0.##")) %
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            }
+        }
+        else
+        {
+            <!-- 6 columns total, so colspan must be 6 -->
+            <tr><td colspan="6" class="text-center text-muted">No records found.</td></tr>
+        }
+    </tbody>
+</table>

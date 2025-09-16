@@ -1,0 +1,44 @@
+﻿@model IEnumerable<AttandanceTracking.Models.SessionAttendanceDetailVM>
+
+@if (Model == null || !Model.Any())
+{
+    <div class="alert alert-warning mb-0">No attendance records in the selected range.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Subject</th>
+                    <th>Date</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model)
+                {
+                    <tr>
+                        <td>@(string.IsNullOrWhiteSpace(r.SubjectName) ? "-" : r.SubjectName)</td>
+                        <td>@r.StartTime.ToString("yyyy-MM-dd")</td>
+                        <td>@r.StartTime.ToString("HH:mm")</td>
+                        <td>@r.EndTime.ToString("HH:mm")</td>
+                        <td>
+                            @if (string.Equals(r.Status, "Present", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <span class="badge bg-success">Present</span>
+                            }
+                            else
+                            {
+
+                                <span class="badge bg-danger">Absent</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

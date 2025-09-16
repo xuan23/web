@@ -1,0 +1,197 @@
+﻿@model AttandanceTracking.Models.StudentAttendanceReportVM
+@using AttandanceTracking.Models
+@using System.Linq
+
+@{
+    ViewData["Title"] = "Student Attendance Summary";
+    var classes = ViewBag.Classes as IEnumerable<Classes> ?? Enumerable.Empty<Classes>();
+    var subjects = ViewBag.Subjects as IEnumerable<Subject> ?? Enumerable.Empty<Subject>();
+}
+
+<h2 class="mb-3">Student Attendance Summary</h2>
+
+<form method="get" class="row g-3 mb-3">
+    <div class="col-md-2">
+        <label class="form-label">Class</label>
+        <select class="form-select" name="ClassId">
+            <option value="">-- All --</option>
+            @foreach (var c in classes)
+            {
+                <option value="@c.Id" selected="@(Model.Filter.ClassId == c.Id ? "selected" : null)">
+                    @c.Code (@c.Description)
+                </option>
+            }
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label">Subject</label>
+        <select class="form-select" name="SubjectId">
+            <option value="">-- All --</option>
+            @foreach (var s in subjects)
+            {
+                <option value="@s.Id" selected="@(Model.Filter.SubjectId == s.Id ? "selected" : null)">
+                    @s.Code - @s.Description
+                </option>
+            }
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label">From</label>
+        <input type="date" class="form-control" name="From" value="@(Model.Filter.From?.ToString("yyyy-MM-dd"))" />
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label">To</label>
+        <input type="date" class="form-control" name="To" value="@(Model.Filter.To?.ToString("yyyy-MM-dd"))" />
+    </div>
+
+    <!-- Search stays col-md-2 (unchanged size) -->
+    <div class="col-md-2">
+        <label class="form-label">Search</label>
+        <input type="text" class="form-control" name="search"
+               value="@(ViewBag.Search as string ?? "")" placeholder="name or email" />
+    </div>
+
+    <!-- Button gets its own width; totals 12 cols: 3+3+1+1+2+2 = 12 -->
+    <div class="col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary w-100">Filter</button>
+    </div>
+</form>
+
+<!-- Table container (AJAX replaces only this block) -->
+<div id="reportTable">
+    @await Html.PartialAsync("~/Views/Report/_ReportTable.cshtml", Model.Rows)
+</div>
+
+<!-- Modal -->
+<div id="detailModal" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 id="detailModalTitle" class="modal-title">Session Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body"><div class="py-3 text-muted">Loading…</div></div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+          // sort state
+          let sort = '@(ViewBag.Sort ?? "StudentName")';
+          let dir  = '@(ViewBag.Dir ?? "asc")';
+
+          // read current filters from the form
+          function currentFilters() {
+            const form = document.querySelector('form');
+            const get = name => (form.querySelector(`[name="${name}"]`)?.value || '').trim();
+            return {
+              ClassId:   get('ClassId'),
+              SubjectId: get('SubjectId'),
+              From:      get('From'),
+              To:        get('To'),
+              search:    get('search')
+            };
+            }
+
+          // fetch sorted table (partial)
+          function refreshTable() {
+            const f = currentFilters();
+            const qs = new URLSearchParams({
+              sort: sort,
+              dir:  dir,
+              search: f.search || '',
+              'filter.ClassId':   f.ClassId,
+              'filter.SubjectId': f.SubjectId,
+              'filter.From':      f.From,
+              'filter.To':        f.To
+            }).toString();
+
+            fetch('@Url.Action("ReportView", "Report")' + '?' + qs, {
+              headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(res => { if (!res.ok) throw res; return res.text(); })
+            .then(html => {
+              document.getElementById('reportTable').innerHTML = html;
+              wireSortLinks();
+              wirePresentLinks();
+              updateSortIndicators();
+            })
+            .catch(async err => {
+              let msg = 'Failed to load table.';
+              try { const t = await err.text(); msg += '\\n' + t; } catch {}
+              alert(msg);
+            });
+          }
+
+          function toggleSort(newSort) {
+            if (sort === newSort) {
+              dir = (dir === 'asc' ? 'des' : 'asc');
+            } else {
+              sort = newSort;
+              dir  = 'asc';
+            }
+            refreshTable();
+          }
+
+          function wireSortLinks() {
+            document.querySelectorAll('.sort-link').forEach(function (a) {
+              a.addEventListener('click', function (e) {
+                e.preventDefault();
+                toggleSort(this.dataset.sort);
+              });
+            });
+          }
+
+          function updateSortIndicators() {
+            document.querySelectorAll('.sort-link .sort-caret').forEach(el => el.textContent = '');
+            const active = document.querySelector(`.sort-link[data-sort="${sort}"] .sort-caret`);
+            if (active) active.textContent = dir === 'asc' ? ' ▲' : ' ▼';
+          }
+
+          function wirePresentLinks() {
+            document.querySelectorAll('.present-link').forEach(function (a) {
+              a.addEventListener('click', function () {
+                const f = currentFilters();
+                const studentId = this.dataset.student || '';
+                const subjName  = (this.dataset.subjectname || '').trim();
+                const label     = subjName || 'Overall';
+
+                document.getElementById('detailModalTitle').textContent = 'Subject: ' + label;
+
+                const modalEl   = document.getElementById('detailModal');
+                const modalBody = modalEl.querySelector('.modal-body');
+                modalBody.innerHTML = '<div class="py-3 text-muted">Loading…</div>';
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+
+                const url = '@Url.Action("StudentSessions", "Report")' + '?' + new URLSearchParams({
+                  studentId: studentId,
+                  classId:   f.ClassId,
+                  subjectId: f.SubjectId,
+                  from:      f.From,
+                  to:        f.To
+                }).toString();
+
+                fetch(url)
+                  .then(res => { if (!res.ok) throw res; return res.text(); })
+                  .then(html => { modalBody.innerHTML = html; })
+                  .catch(async err => {
+                    let msg = 'Unknown error';
+                    try { const t = await err.text(); msg = `Error ${err.status}: ${err.statusText}\\n${t||''}`; } catch {}
+                    modalBody.innerHTML = `<div class="text-danger" style="white-space:pre-wrap;">${msg}</div>`;
+                  });
+              });
+            });
+          }
+
+          wireSortLinks();
+          wirePresentLinks();
+          updateSortIndicators();
+        })();
+    </script>
+}

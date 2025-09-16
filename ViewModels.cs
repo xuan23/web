@@ -8,15 +8,19 @@ namespace AttandanceTracking.Models;
 
 public class RegisterViewModel
 {
+    public string? Id { get; set; }
+
+    [Required]
     public string FullName { get; set; }
+
+    [Required, EmailAddress]
     public string Email { get; set; }
 
-    // New property
-    [Required]
-    public Guid ClassId { get; set; }
-
-    // For rendering dropdown
+    public Guid? ClassId { get; set; }
     public List<SelectListItem>? Classes { get; set; }
+
+    public List<Guid> SelectedSubjectIds { get; set; } = new List<Guid>();
+    public List<SelectListItem>? Subjects { get; set; }
 }
 public class LoginViewModel
 {
@@ -79,37 +83,62 @@ public class ClassViewModel
     public List<SelectListItem> AllStudents { get; set; } = new List<SelectListItem>();
 }
 
+// existing viewmodels ...
 
+// Filters coming from the ReportView filter bar
 public class AttendanceFilterVM
 {
-    [Display(Name = "Class")] public Guid? ClassId { get; set; }
-    [Display(Name = "Subject")] public Guid? SubjectId { get; set; }
-
-    [Display(Name = "From"), DataType(DataType.Date)]
-    public DateTime? From { get; set; }
-
-    [Display(Name = "To"), DataType(DataType.Date)]
-    public DateTime? To { get; set; }
+    public Guid? ClassId { get; set; }
+    public Guid? SubjectId { get; set; }
+    [DataType(DataType.Date)] public DateTime? From { get; set; }
+    [DataType(DataType.Date)] public DateTime? To { get; set; }
 }
 
+// One row in the summary table
 public class StudentAttendanceRowVM
 {
     public string StudentId { get; set; } = "";
     public string StudentName { get; set; } = "";
+    public string? StudentEmail { get; set; }
+
     public string? ClassCode { get; set; }
+    public string? ClassName { get; set; }
+
     public string? SubjectCode { get; set; }
+    public string? SubjectName { get; set; }
 
     public int TotalSessions { get; set; }
     public int PresentCount { get; set; }
-    public double Percentage => TotalSessions == 0 ? 0 : Math.Round(PresentCount * 100.0 / TotalSessions, 2);
 
-    // Show schedule from the student's most-recent attended session in range
-    public DateTime? StartTime { get; set; }
-    public DateTime? EndTime { get; set; }
+    public double Percentage => TotalSessions > 0 ? (PresentCount * 100.0 / TotalSessions) : 0.0;
 }
 
+// Page VM for ReportView
 public class StudentAttendanceReportVM
 {
     public AttendanceFilterVM Filter { get; set; } = new();
     public List<StudentAttendanceRowVM> Rows { get; set; } = new();
+}
+
+// Detail rows for the modal partial
+public partial class SessionAttendanceDetailVM
+{
+    public string? SubjectName { get; set; }
+    public DateTime StartTime { get; set; } // non-nullable: matches the partial formatting
+    public DateTime EndTime { get; set; } // non-nullable
+    public string Status { get; set; } = "Absent"; // "Present" or "Absent"
+}
+
+
+public class StudentSubjectSummaryRowVM
+{
+    public Guid SubjectId { get; set; }
+    public string SubjectCode { get; set; } = "-";
+    public string SubjectName { get; set; } = "Overall";
+    public string LecturerNames { get; set; } = "-"; // comma-separated
+
+    public int TotalSessions { get; set; }   // denominator
+    public int PresentCount { get; set; }    // distinct sessions student was present
+
+    public double Percentage => TotalSessions > 0 ? (PresentCount * 100.0 / TotalSessions) : 0.0;
 }

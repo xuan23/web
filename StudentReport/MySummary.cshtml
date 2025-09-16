@@ -1,0 +1,165 @@
+﻿@model List<AttandanceTracking.Models.StudentSubjectSummaryRowVM>
+
+@{
+    ViewData["Title"] = "My Attendance Summary";
+
+    // Passed from controller:
+    var sort = (ViewBag.Sort as string) ?? "";
+    var dir = (ViewBag.Dir as string) ?? "";
+    var isAsc = string.Equals(dir, "asc", StringComparison.OrdinalIgnoreCase);
+
+    // Next sort direction for a given column
+    string NextDir(string key) =>
+        (string.Equals(sort, key, StringComparison.OrdinalIgnoreCase) && isAsc) ? "desc" : "asc";
+
+    // ▲ / ▼ indicator for active column
+    Func<string, string> Arrow = key =>
+        string.Equals(sort, key, StringComparison.OrdinalIgnoreCase)
+            ? (isAsc ? " ▲" : " ▼")
+            : "";
+}
+
+<style>
+    /* fixed layout + clean truncation */
+    table.fixed-table {
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    .col-subject {
+        width: 40%;
+    }
+
+    .col-present {
+        width: 15%;
+    }
+
+    .col-average {
+        width: 35%;
+    }
+
+    .col-actions {
+        width: 10%;
+    }
+
+    .truncate {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .text-center-vert {
+        vertical-align: middle !important;
+    }
+    /* nicer alignment for header links + arrows */
+    .table thead th a {
+        display: inline-flex;
+        align-items: center;
+        gap: .25rem;
+    }
+</style>
+
+<h2 class="mb-3">My Attendance Summary</h2>
+
+@if (Model == null || !Model.Any())
+{
+    <div class="alert alert-info">No sessions found for your class yet.</div>
+}
+else
+{
+    <table class="table table-bordered table-striped align-middle fixed-table">
+        <colgroup>
+            <col class="col-subject" />
+            <col class="col-present" />
+            <col class="col-average" />
+            <col class="col-actions" />
+        </colgroup>
+        <thead>
+            <tr>
+                <th class="col-subject">
+                    <a asp-action="MySummary"
+                       asp-route-sort="SubjectName"
+                       asp-route-dir="@NextDir("SubjectName")">
+                        Subject@(Arrow("SubjectName"))
+                    </a>
+                </th>
+                <th class="col-present text-center">Present</th>
+                <th class="col-average">
+                    <a asp-action="MySummary"
+                       asp-route-sort="Percentage"
+                       asp-route-dir="@NextDir("Percentage")">
+                        Attendance Average@(Arrow("Percentage"))
+                    </a>
+                </th>
+                <th class="col-actions text-center">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in Model)
+            {
+                var pct = r.Percentage; // 0..100
+                var barClass = pct < 80 ? "bg-danger" : (pct < 90 ? "bg-warning" : "bg-success");
+                var pctText = pct.ToString("0.0");
+                var pctWidth = (int)Math.Round(Math.Max(0, Math.Min(100, pct)));
+
+                <tr>
+                    <td class="truncate">@r.SubjectName</td>
+                    <td class="text-center text-center-vert">
+                        @($"{r.PresentCount} / {r.TotalSessions}")
+                    </td>
+                    <td>
+                        <div class="progress" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100">
+                            <div class="progress-bar @barClass" style="width:@(pctWidth)%"></div>
+                        </div>
+                        <small>@(pctText)%</small>
+                    </td>
+                    <td class="text-center text-center-vert">
+                        <button type="button"
+                                class="btn btn-sm btn-primary student-sessions-btn"
+                                data-subject-id="@r.SubjectId">
+                            Detail
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<!-- Modal -->
+<div class="modal fade" id="studentSessionsModal" tabindex="-1" aria-labelledby="studentSessionsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="studentSessionsLabel">Session Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="studentSessionsBody">Loading...</div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Only the modal uses fetch; sorting uses normal links (non-AJAX)
+        document.addEventListener('click', async (e) => {
+          const btn = e.target.closest('.student-sessions-btn');
+          if (!btn) return;
+
+          const subjectId = btn.getAttribute('data-subject-id');
+          const url = `/StudentReport/StudentSessions?subjectId=${subjectId}`;
+
+          const body = document.getElementById('studentSessionsBody');
+          body.textContent = 'Loading...';
+          try {
+            const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }});
+            body.innerHTML = await res.text();
+          } catch {
+            body.innerHTML = '<div class="alert alert-danger">Failed to load sessions.</div>';
+          }
+
+          const modal = new bootstrap.Modal(document.getElementById('studentSessionsModal'));
+          modal.show();
+        });
+    </script>
+}
